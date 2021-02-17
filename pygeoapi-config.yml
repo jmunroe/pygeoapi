@@ -39,8 +39,8 @@ server:
     pretty_print: true
     limit: 10
     # templates:
-      # path: /path/to/Jinja2/templates
-      # static: /path/to/static/folder # css/js/img
+    # path: /path/to/Jinja2/templates
+    # static: /path/to/static/folder # css/js/img
     map:
         url: https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png
         attribution: '<a href="https://wikimediafoundation.org/wiki/Maps_Terms_of_Use">Wikimedia maps</a> | Map data &copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
@@ -48,10 +48,10 @@ server:
 #        name: TinyDB
 #        connection: /tmp/pygeoapi-process-manager.db
 #        output_dir: /tmp/
-    # ogc_schemas_location: /opt/schemas.opengis.net
+# ogc_schemas_location: /opt/schemas.opengis.net
 
 logging:
-    level: ERROR
+    level: DEBUG
     #logfile: /tmp/pygeoapi.log
 
 metadata:
@@ -88,6 +88,76 @@ metadata:
         role: pointOfContact
 
 resources:
+    sst_netcdf:
+        type: collection
+        title: SST netcdf sample
+        description: SST sample
+        keywords:
+            - model
+        extents:
+            spatial:
+                bbox: [-180, -90, 180, 90]
+                crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
+            temporal:
+                begin: 2000-01-01T00:00:00
+                end: 2001-01-01T00:00:00
+
+        links:
+            - type: text/html
+              rel: canonical
+              title: information
+              href: https://github.com/geopython/pygeoapi/tree/master/tests/data
+              hreflang: en-US
+        providers:
+            - type: coverage
+              name: xarray
+              data: tests/data/coads_sst.nc
+              # optionally specify x/y/time fields, else provider will attempt
+              # to derive automagically
+              y_field: COADSY
+              x_field: COADSX
+              time_field: TIME
+              format:
+                  name: netcdf
+                  mimetype: application/x-netcdf
+            - type: tile
+              name: xarray
+              data: tests/data/coads_sst.nc
+              options:
+                  metadata_format: raw # default | tilejson
+                  zoom:
+                      min: 0
+                      max: 5
+                  schemes:
+                      - WorldCRS84Quad
+              format:
+                  name: pbf
+                  mimetype: application/vnd.mapbox-vector-tile
+
+    sst_zarr:
+        type: collection
+        title: SST zarr sample
+        description: SST sample
+        keywords:
+            - model
+        extents:
+            spatial:
+                bbox: [-180, -90, 180, 90]
+                crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
+        links:
+            - type: text/html
+              rel: canonical
+              title: information
+              href: https://github.com/geopython/pygeoapi/tree/master/tests/data
+              hreflang: en-US
+        providers:
+            - type: coverage
+              name: xarray
+              data: tests/data/analysed_sst.zarr
+              format:
+                  name: zarr
+                  mimetype: application/zip
+
     obs:
         type: collection
         title: Observations
@@ -113,7 +183,7 @@ resources:
               hreflang: en-US
         extents:
             spatial:
-                bbox: [-180,-90,180,90]
+                bbox: [-180, -90, 180, 90]
                 crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
             temporal:
                 begin: 2000-10-30T18:24:39Z
@@ -141,16 +211,30 @@ resources:
               hreflang: en-US
         extents:
             spatial:
-                bbox: [-180,-90,180,90]
+                bbox: [-180, -90, 180, 90]
                 crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
             temporal:
                 begin: 2011-11-11
-                end: null  # or empty (either means open ended)
+                end: null # or empty (either means open ended)
         providers:
             - type: feature
               name: GeoJSON
               data: tests/data/ne_110m_lakes.geojson
               id_field: id
+            - type: tile
+              name: MVT
+              data: tests/data/tiles/ne_110m_lakes # local directory tree
+              # data: https://example.org/ne_110m_lakes/{z}/{x}/{y}.pbf
+              options:
+                  metadata_format: raw # default | tilejson
+                  zoom:
+                      min: 0
+                      max: 5
+                  schemes:
+                      - WorldCRS84Quad
+              format:
+                  name: pbf
+                  mimetype: application/vnd.mapbox-vector-tile
 
     gdps-temperature:
         type: collection
@@ -161,7 +245,7 @@ resources:
             - global
         extents:
             spatial:
-                bbox: [-180,-90,180,90]
+                bbox: [-180, -90, 180, 90]
                 crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
         links:
             - type: text/html
@@ -194,7 +278,7 @@ resources:
               hreflang: en-US
         extents:
             spatial:
-                bbox: [-180,-90,180,90]
+                bbox: [-180, -90, 180, 90]
                 crs: http://www.opengis.net/def/crs/OGC/1.3/CRS84
         providers:
             - type: stac

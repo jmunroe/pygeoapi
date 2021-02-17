@@ -290,6 +290,19 @@ class XarrayProvider(BaseProvider):
         elif format_ == 'zarr':
             LOGGER.debug('Returning data in native zarr format')
             return _get_zarr_data(data)
+        elif format_ == 'png':
+
+            from PIL import Image
+            from matplotlib import cm
+            with tempfile.TemporaryFile() as fp:
+                data_array = data.to_array().squeeze().values
+                normed = data_array / np.nanmax(data_array)
+                d = cm.viridis(normed[::-1,:], bytes=True)
+                im = Image.fromarray(d)
+                im.save(fp, format=format_)
+                fp.seek(0)
+                return fp.read()
+
         else:  # return data in native format
             with tempfile.TemporaryFile() as fp:
                 LOGGER.debug('Returning data in native NetCDF format')

@@ -1224,6 +1224,9 @@ class API:
 
         return headers_, 200, to_json(content, self.pretty_print)
 
+    def get_coverage_data(self, dataset):
+        pass
+
     @jsonldify
     def get_collection_coverage(self, headers, args, dataset):
         """
@@ -1532,6 +1535,200 @@ class API:
             LOGGER.error(exception)
             return headers_, 400, to_json(exception, self.pretty_print)
 
+
+    @jsonldify
+    def get_collection_coverage_tiles(self, headers_, args,  dataset, tileMatrixSetId, tileMatrix, tileRow, tileCol, format_):
+        """
+        Provide coverage tiles
+
+        :param dataset: dataset name
+        :param tileMatrixSetId: tile matrix set identifier
+        :param tileMatrix: tile matrix identifier
+        :param tileRow: tile row identifier
+        :param tileCol: tile col identifier
+        :param format_: file format for tiles
+
+        :returns: tuple of headers, status code, content
+        """
+
+        headers_ = HEADERS.copy()
+        query_args = {}
+
+        LOGGER.debug('Processing query parameters')
+
+        subsets = {}
+
+        LOGGER.debug('Loading provider')
+        try:
+            collection_def = get_provider_by_type(
+                self.config['resources'][dataset]['providers'], 'coverage')
+
+            p = load_plugin('provider', collection_def)
+        except KeyError:
+            exception = {
+                'code': 'InvalidParameterValue',
+                'description': 'collection does not exist'
+            }
+            LOGGER.error(exception)
+            return headers_, 404, to_json(exception, self.pretty_print)
+        except ProviderTypeError:
+            exception = {
+                'code': 'NoApplicableCode',
+                'description': 'invalid provider type'
+            }
+            LOGGER.error(exception)
+            return headers_, 400, to_json(exception, self.pretty_print)
+        except ProviderConnectionError:
+            exception = {
+                'code': 'NoApplicableCode',
+                'description': 'connection error (check logs)'
+            }
+            LOGGER.error(exception)
+            return headers_, 500, to_json(exception, self.pretty_print)
+
+        LOGGER.debug('Processing bbox parameter')
+
+        bbox = args.get('bbox')
+
+        if bbox is None:
+            bbox = []
+        else:
+            try:
+                bbox = validate_bbox(bbox)
+            except ValueError as err:
+                exception = {
+                    'code': 'InvalidParameterValue',
+                    'description': str(err)
+                }
+                LOGGER.error(exception)
+                return headers_, 400, to_json(exception, self.pretty_print)
+
+        query_args['bbox'] = bbox
+
+        LOGGER.debug('Processing datetime parameter')
+
+        datetime_ = args.get('datetime', None)
+
+        try:
+            datetime_ = validate_datetime(
+                self.config['resources'][dataset]['extents'], datetime_)
+        except ValueError as err:
+            exception = {
+                'code': 'InvalidParameterValue',
+                'description': str(err)
+            }
+            LOGGER.error(exception)
+            return headers_, 400, to_json(exception, self.pretty_print)
+
+        query_args['datetime_'] = datetime_
+
+        query_args['format_'] = format_
+
+        if 'rangeSubset' in args:
+            LOGGER.debug('Processing rangeSubset parameter')
+
+            query_args['range_subset'] = list(
+                filter(None, args['rangeSubset'].split(',')))
+            LOGGER.debug('Fields: {}'.format(query_args['range_subset']))
+
+            for a in query_args['range_subset']:
+                if a not in p.fields:
+                    exception = {
+                        'code': 'InvalidParameterValue',
+                        'description': 'Invalid field specified'
+                    }
+                    LOGGER.error(exception)
+                    return headers_, 400, to_json(exception, self.pretty_print)
+
+        if 'subset' in args:
+            LOGGER.debug('Processing subset parameter')
+            for s in args['subset'].split(','):
+                try:
+                    if '"' not in s:
+                        m = re.search(r'(.*)\((.*):(.*)\)', s)
+                    else:
+                        m = re.search(r'(.*)\(\"(\S+)\":\"(\S+.*)\"\)', s)
+
+                    subset_name = m.group(1)
+
+                    if subset_name not in p.axes:
+                        exception = {
+                            'code': 'InvalidParameterValue',
+                            'description': 'Invalid axis name'
+                        }
+                        LOGGER.error(exception)
+                        return (headers_, 400, to_json(exception,
+                                self.pretty_print))
+
+                    subsets[subset_name] = list(map(
+                        get_typed_value, m.group(2, 3)))
+                except AttributeError:
+                    exception = {
+                        'code': 'InvalidParameterValue',
+                        'description': 'subset should be like "axis(min:max)"'
+                    }
+                    LOGGER.error(exception)
+                    return headers_, 400, to_json(exception, self.pretty_print)
+
+            query_args['subsets'] = subsets
+            LOGGER.debug('Subsets: {}'.format(query_args['subsets']))
+
+        LOGGER.debug('Querying coverage')
+        try:
+            data = p.query(**query_args)
+
+        except ProviderInvalidQueryError as err:
+            exception = {
+                'code': 'NoApplicableCode',
+                'description': 'query error: {}'.format(err),
+            }
+            LOGGER.error(exception)
+            return headers_, 400, to_json(exception, self.pretty_print)
+        except ProviderNoDataError:
+            exception = {
+                'code': 'NoApplicableCode',
+                'description': 'No data found'
+            }
+            LOGGER.debug(exception)
+            return headers_, 204, to_json(exception, self.pretty_print)
+        except ProviderQueryError:
+            exception = {
+                'code': 'NoApplicableCode',
+                'description': 'query error (check logs)'
+            }
+            LOGGER.error(exception)
+            return headers_, 500, to_json(exception, self.pretty_print)
+
+        mt = collection_def['format']['name']
+
+        if format_ == mt:
+            headers_['Content-Type'] = collection_def['format']['mimetype']
+            return headers_, 200, data
+        elif format_ == 'json':
+            headers_['Content-Type'] = 'application/prs.coverage+json'
+            return headers_, 200, to_json(data, self.pretty_print)
+        elif format_ == 'png':
+            headers_['Content-Type'] = 'image/png'
+            return headers_, 200, data
+        else:
+            exception = {
+                'code': 'InvalidParameterValue',
+                'description': 'invalid format parameter'
+            }
+            LOGGER.error(exception)
+            return headers_, 400, to_json(data, self.pretty_print)
+        if any([dataset is None,
+                dataset not in self.config['resources'].keys()]):
+
+            exception = {
+                'code': 'InvalidParameterValue',
+                'description': 'Invalid collection'
+            }
+            LOGGER.error(exception)
+            return headers_, 400, json.dumps(exception)
+
+
+
     @pre_process
     @jsonldify
     def get_collection_tiles(self, headers_, format_, dataset=None):
@@ -1624,7 +1821,7 @@ class API:
         for service in p.get_tiles_service(
             baseurl=self.config['server']['url'],
             servicepath='/collections/{}/\
-tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'
+tiles/{{{}}}/{{{}}}/{{{}}}/{{{}}}?f=mvt'  ## can't hardcode as mvt
             .format(dataset, 'tileMatrixSetId',
                     'tileMatrix', 'tileRow', 'tileCol'))['links']:
             tiles['links'].append(service)

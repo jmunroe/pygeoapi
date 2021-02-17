@@ -266,6 +266,33 @@ def collection_coverage_domainset(collection_id):
     return response
 
 
+@BLUEPRINT.route('/collections/<collection_id>/coverage/tiles/<tileMatrixSetId>/<tileMatrix>/<tileRow>/<tileCol>.<format_>')
+def collection_coverage_tiles(collection_id, tileMatrixSetId, tileMatrix, tileRow, tileCol, format_):
+    """
+    OGC API - Coverages coverage tiles endpoint
+
+    :param collection_id: collection identifier
+    :param tileMatrixSetId: tile matrix set identifier
+    :param tileMatrix: tile matrix identifier
+    :param tileRow: tile row identifier
+    :param tileCol: tile col identifier
+    :param format_: tile file format
+
+    :returns: HTTP response
+    """
+
+    headers, status_code, content = api_.get_collection_coverage_tiles(
+        request.headers, request.args, collection_id, 
+           tileMatrixSetId, tileMatrix, tileRow, tileCol, format_)
+
+    response = make_response(content, status_code)
+
+    if headers:
+        response.headers = headers
+
+    return response
+
+
 @BLUEPRINT.route('/collections/<collection_id>/coverage/rangetype')
 def collection_coverage_rangetype(collection_id):
     """

@@ -35,6 +35,9 @@ import zipfile
 import xarray
 import numpy as np
 
+from PIL import Image, ImageDraw
+from matplotlib import cm
+
 from pygeoapi.provider.base import (BaseProvider,
                                     ProviderConnectionError,
                                     ProviderNoDataError,
@@ -181,6 +184,68 @@ class XarrayProvider(BaseProvider):
 
         return rangetype
 
+    def query_tile(self, range_subset=[], subsets={}, bbox=[], 
+                   datetime_=None, 
+                   matrix_id=None, z_idx=None,
+                   y_idx=None, x_idx=None,
+                   tile_format=None
+                   ):
+
+        # perform query
+        data = self.query(range_subset, subsets, bbox, 
+                            datetime_, format_='xarray')
+
+        # check that this is a 2D array
+
+        # subset based on tile info
+        # GDAL has this functionality but xarray-spatial is an alternative
+
+        # Basic idea...
+        tile_size = 256
+        resFact = 360.0 / tile_size
+
+        z_idx = int(z_idx)
+        x_idx, y_idx = int(y_idx), int(x_idx)
+
+        # invert y
+        y_idx = (2 ** z_idx) - 1 - y_idx
+        
+        res = resFact / 2**z_idx
+
+        xmin, ymin, xmax, ymax = (
+            x_idx * tile_size * res - 180,
+            y_idx * tile_size * res/2 - 90,
+            (x_idx + 1) * tile_size * res - 180,
+            (y_idx + 1) * tile_size * res/2 - 90
+        )
+
+        # generate tile image
+
+        ## hardcoded for test example currently
+        ## We'll need some of the metadata already determined in .query()
+        data = data.sel(COADSX=slice(xmin, xmax), COADSY=slice(ymin, ymax))
+        span = [0, 30]
+
+        if tile_format =='png':
+            with tempfile.TemporaryFile() as fp:
+                data_array = data.to_array().squeeze().values
+                normed = (data_array - span[0]) / span[1]
+                d = cm.viridis(normed[::-1,:], bytes=True)
+                im = Image.fromarray(d)
+                #im1 = im.resize((tile_size, tile_size), Image.ANTIALIAS)
+                im1 = im.resize((tile_size, tile_size), Image.NEAREST)
+
+                d = ImageDraw.Draw(im1)
+                d.text((10,10), f"z={z_idx} x={x_idx} y={y_idx}", fill=(255,255,0))
+
+                im1.save(fp, format=tile_format)
+                fp.seek(0)
+                return fp.read()
+        else:
+            # what kind of exception to throw?
+            LOGGER.error('Unknown tile format')
+            return None
+ 
     def query(self, range_subset=[], subsets={}, bbox=[], datetime_=None,
               format_='json'):
         """
@@ -290,19 +355,9 @@ class XarrayProvider(BaseProvider):
         elif format_ == 'zarr':
             LOGGER.debug('Returning data in native zarr format')
             return _get_zarr_data(data)
-        elif format_ == 'png':
-
-            from PIL import Image
-            from matplotlib import cm
-            with tempfile.TemporaryFile() as fp:
-                data_array = data.to_array().squeeze().values
-                normed = data_array / np.nanmax(data_array)
-                d = cm.viridis(normed[::-1,:], bytes=True)
-                im = Image.fromarray(d)
-                im.save(fp, format=format_)
-                fp.seek(0)
-                return fp.read()
-
+        elif format_ == 'xarray':
+            LOGGER.debug('Returning data as xarray object')
+            return data
         else:  # return data in native format
             with tempfile.TemporaryFile() as fp:
                 LOGGER.debug('Returning data in native NetCDF format')

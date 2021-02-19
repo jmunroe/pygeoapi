@@ -120,9 +120,14 @@ resources:
               format:
                   name: netcdf
                   mimetype: application/x-netcdf
-            - type: tile
-              name: xarray
+            - type: coverage
+              name: xarray-tile
               data: tests/data/coads_sst.nc
+              # optionally specify x/y/time fields, else provider will attempt
+              # to derive automagically
+              y_field: COADSY
+              x_field: COADSX
+              time_field: TIME
               options:
                   metadata_format: raw # default | tilejson
                   zoom:
@@ -131,8 +136,8 @@ resources:
                   schemes:
                       - WorldCRS84Quad
               format:
-                  name: pbf
-                  mimetype: application/vnd.mapbox-vector-tile
+                  name: png
+                  mimetype: image/png
 
     sst_zarr:
         type: collection

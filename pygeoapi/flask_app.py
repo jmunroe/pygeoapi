@@ -265,25 +265,71 @@ def collection_coverage_domainset(collection_id):
 
     return response
 
+### Coverage-tiles
 
-@BLUEPRINT.route('/collections/<collection_id>/coverage/tiles/<tileMatrixSetId>/<tileMatrix>/<tileRow>/<tileCol>.<format_>')
-def collection_coverage_tiles(collection_id, tileMatrixSetId, tileMatrix, tileRow, tileCol, format_):
+@BLUEPRINT.route('/collections/<collection_id>/coverage/tiles')
+def get_collection_coverage_tiles(collection_id=None):
     """
-    OGC API - Coverages coverage tiles endpoint
+    OGC open api collections tiles access point
 
     :param collection_id: collection identifier
-    :param tileMatrixSetId: tile matrix set identifier
-    :param tileMatrix: tile matrix identifier
-    :param tileRow: tile row identifier
-    :param tileCol: tile col identifier
-    :param format_: tile file format
 
     :returns: HTTP response
     """
 
     headers, status_code, content = api_.get_collection_coverage_tiles(
-        request.headers, request.args, collection_id, 
-           tileMatrixSetId, tileMatrix, tileRow, tileCol, format_)
+        request.headers, request.args, collection_id)
+
+    response = make_response(content, status_code)
+
+    if headers:
+        response.headers = headers
+
+    return response
+
+
+@BLUEPRINT.route('/collections/<collection_id>/coverage/tiles/<tileMatrixSetId>/metadata')  # noqa
+def get_collection_coverage_tiles_metadata(collection_id=None, tileMatrixSetId=None):
+    """
+    OGC open api collection tiles service metadata
+
+    :param collection_id: collection identifier
+    :param tileMatrixSetId: identifier of tile matrix set
+
+    :returns: HTTP response
+    """
+
+    headers, status_code, content = api_.get_collection_coverage_tiles_metadata(
+        request.headers, request.args, collection_id, tileMatrixSetId)
+
+    response = make_response(content, status_code)
+
+    if headers:
+        response.headers = headers
+
+    return response
+
+
+@BLUEPRINT.route('/collections/<collection_id>/coverage/tiles/\
+<tileMatrixSetId>/<tileMatrix>/<tileRow>/<tileCol>.<tileFormat>')
+def get_collection_coverage_tiles_data(collection_id=None, tileMatrixSetId=None,
+                              tileMatrix=None, tileRow=None, tileCol=None, tileFormat=None):
+    """
+    OGC open api collection tiles service data
+
+    :param collection_id: collection identifier
+    :param tileMatrixSetId: identifier of tile matrix set
+    :param tileMatrix: identifier of {z} matrix index
+    :param tileRow: identifier of {y} matrix index
+    :param tileCol: identifier of {x} matrix index
+    :param tileFormat: requested format for tile
+
+    :returns: HTTP response
+    """
+
+    headers, status_code, content = api_.get_collection_coverage_tiles_data(
+        request.headers, request.args, collection_id,
+        tileMatrixSetId, tileMatrix, tileRow, tileCol, tileFormat)
 
     response = make_response(content, status_code)
 
